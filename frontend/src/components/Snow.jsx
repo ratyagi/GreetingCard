@@ -1,12 +1,14 @@
 import React, { useMemo } from "react";
 
-// Soft falling snow — mostly white, a few warm red flakes, to match the
-// cream / red / white festive palette.
+// Soft falling snow: mostly white, with some warm red and golden flakes, to match the
+// cream / red / gold festive palette.
 export const Snow = ({ count = 48 }) => {
   const flakes = useMemo(() => {
     const rand = (min, max) => Math.random() * (max - min) + min;
     return Array.from({ length: count }).map((_, i) => {
-      const isRed = Math.random() < 0.18;
+      const roll = Math.random();
+      const isRed = roll < 0.16;
+      const isGold = !isRed && roll < 0.36;
       const size = rand(3, 8);
       return {
         id: i,
@@ -16,10 +18,12 @@ export const Snow = ({ count = 48 }) => {
         delay: rand(-15, 0),
         drift: `${rand(-6, 6)}vw`,
         opacity: rand(0.5, 0.95),
-        color: isRed ? "#c9414f" : "#ffffff",
+        color: isRed ? "#c9414f" : isGold ? "#dcae45" : "#ffffff",
         glow: isRed
           ? "0 0 6px rgba(201,65,79,0.7)"
-          : "0 0 5px rgba(255,255,255,0.85)",
+          : isGold
+            ? "0 0 7px rgba(220,174,69,0.85)"
+            : "0 0 5px rgba(255,255,255,0.85)",
       };
     });
   }, [count]);

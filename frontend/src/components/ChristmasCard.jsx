@@ -16,32 +16,49 @@ const EASE = [0.22, 1, 0.36, 1];
 const OPEN_DEG = -172; // flap rotation when the card is fully open
 const DRAG_PX = 260; // how far you drag up to open the card all the way
 
+const ENV_BG = "linear-gradient(160deg, #efe2c6 0%, #e7d6b4 100%)";
+const ENV_BORDER = "1px solid rgba(125,96,52,0.3)";
+const ENV_EXIT = { duration: 0.9, ease: EASE };
+
 export default function ChristmasCard() {
-  // 'sealed' -> (click) -> 'card' (folded, shows graphic) -> (click) -> flat & typing
-  const [step, setStep] = useState("sealed");
+  // Sequence: sealed -> flap opens -> card slides up out of the envelope ->
+  // card moves forward and settles in the centre (envelope sinks away) -> drag up to open
+  const [step, setStep] = useState("sealed"); // 'sealed' | 'card' (interactive)
   const [flapOpen, setFlapOpen] = useState(false);
+  const [flapBehind, setFlapBehind] = useState(false);
   const [cardOut, setCardOut] = useState(false);
+  const [settled, setSettled] = useState(false);
   const [cardFlat, setCardFlat] = useState(false);
   const [typed, setTyped] = useState(0);
+  const [run, setRun] = useState(0);
   const timers = useRef([]);
   const typeTimer = useRef(null);
 
-  // The flap angle is driven live by the drag; the card's top margin follows it
+  // The flap angle is driven live by the drag; spare room above the card follows it
   const flapRot = useMotionValue(0);
   const lift = useTransform(flapRot, [0, OPEN_DEG], [0, 300]);
+  const reserve = useMotionValue(0); // room for the envelope flap while it is open
+  const marginTop = useTransform([reserve, lift], ([r, l]) => Math.max(r, l));
   const drag = useRef({ active: false, startY: 0, startRot: 0, moved: false });
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
   };
+  const later = (fn, ms) => timers.current.push(setTimeout(fn, ms));
 
   const openEnvelope = useCallback(() => {
-    if (step !== "sealed") return;
-    setFlapOpen(true);
-    timers.current.push(setTimeout(() => setCardOut(true), 650));
-    timers.current.push(setTimeout(() => setStep("card"), 2100));
-  }, [step]);
+    if (step !== "sealed" || flapOpen) return;
+    setFlapOpen(true); // flap lifts quickly
+    animate(reserve, 190, { duration: 0.6, ease: EASE });
+    later(() => setFlapBehind(true), 260); // flap passes vertical: tuck it behind the card
+    later(() => setCardOut(true), 420); // card slides up out of the envelope
+    later(() => {
+      setSettled(true); // card moves forward to the centre, envelope sinks away
+      animate(reserve, 0, { duration: 1.1, ease: EASE });
+    }, 1650);
+    later(() => setStep("card"), 2750);
+  }, [step, flapOpen, reserve]);
 
   const toggleCard = useCallback(() => {
     if (step !== "card") return;
@@ -80,14 +97,19 @@ export default function ChristmasCard() {
   const replay = useCallback(() => {
     clearTimers();
     clearInterval(typeTimer.current);
+    flapRot.set(0);
+    reserve.set(0);
     setCardFlat(false);
     setCardOut(false);
+    setSettled(false);
+    setFlapBehind(false);
     setFlapOpen(false);
     setTyped(0);
     setStep("sealed");
-  }, []);
+    setRun((r) => r + 1);
+  }, [flapRot, reserve]);
 
-  /* typewriter typing — only once the card is opened flat */
+  /* typewriter typing, only once the card is opened flat */
   useEffect(() => {
     clearInterval(typeTimer.current);
     if (!cardFlat) {
@@ -115,6 +137,7 @@ export default function ChristmasCard() {
 
   const done = cardFlat && typed >= FULL_TEXT.length;
   const visibleText = FULL_TEXT.slice(0, typed);
+  const envAnim = settled ? { opacity: 0, y: 90 } : { opacity: 1, y: 0 };
 
   return (
     <div className="stage pt-[104px] sm:pt-[120px]" data-testid="card-stage">
@@ -142,180 +165,80 @@ export default function ChristmasCard() {
         </span>
       </header>
 
-      <AnimatePresence mode="wait">
-        {step === "sealed" ? (
-          /* ==================== SCENE 1 · THE ENVELOPE ==================== */
-          <motion.div
-            key="envelope"
-            className="relative z-10 flex flex-col items-center"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, filter: "blur(4px)" }}
-            transition={{ duration: 0.8, ease: EASE }}
-            data-testid="scene-envelope"
-          >
-            <div className="scale-[0.74] sm:scale-100">
-              <motion.button
-                type="button"
-                onClick={openEnvelope}
-                aria-label="Open the envelope"
-                data-testid="envelope-open"
-                className="pressable envelope-shadow relative block rounded-[10px]"
-                style={{
-                  width: 470,
-                  height: 312,
-                  background: "linear-gradient(160deg, #efe2c6 0%, #e7d6b4 100%)",
-                  border: "1px solid rgba(125,96,52,0.3)",
-                  perspective: 1100,
-                }}
-                whileHover={!flapOpen ? { y: -6 } : {}}
-                transition={{ duration: 0.4 }}
-              >
-                {/* front face: address + stamp */}
-                <div className="absolute inset-0 overflow-hidden rounded-[10px]">
-                  {/* pocket seams */}
-                  <div
-                    className="absolute inset-x-0 bottom-0"
-                    style={{
-                      height: "62%",
-                      background: "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(125,96,52,0.06))",
-                      clipPath: "polygon(0 42%, 50% 0, 100% 42%, 100% 100%, 0 100%)",
-                      borderTop: "1px solid rgba(125,96,52,0.18)",
-                    }}
-                  />
-                  {/* subscriber masthead label */}
-                  <div className="absolute left-6 bottom-5">
-                    <span className="smallcaps" style={{ fontSize: 8.5, color: "#8a7a55" }}>
-                      The New Yorker &middot; Holiday Issue
-                    </span>
-                  </div>
-                  {/* stamp */}
-                  <div className="absolute right-5 top-5 w-[92px]">
-                    <div className="stamp">
-                      <img
-                        src={stampImg}
-                        alt="Typewriter postage stamp"
-                        className="w-full h-[104px] object-cover"
-                        draggable={false}
-                      />
-                    </div>
-                    <div
-                      className="mt-1 text-center font-type text-[9px] tracking-widest"
-                      style={{ color: "var(--holly-red)" }}
-                    >
-                      NORTH POLE &middot; DEC 25
-                    </div>
-                  </div>
-                  {/* address */}
-                  <div className="absolute left-7 top-[46%] -translate-y-1/2">
-                    <p className="handwriting text-sm" style={{ color: "#8a7a55" }}>
-                      to my dearest
-                    </p>
-                    <p
-                      className="handwriting text-3xl leading-tight"
-                      style={{ color: "var(--ink)" }}
-                    >
-                      sister
-                    </p>
-                    <div
-                      className="mt-1 h-px w-40"
-                      style={{ background: "linear-gradient(90deg, var(--holly-red), transparent)" }}
-                    />
-                  </div>
-                </div>
-
-                {/* flap */}
-                <motion.div
-                  className="absolute left-0 top-0"
-                  style={{
-                    width: 470,
-                    height: 182,
-                    transformOrigin: "top center",
-                    transformStyle: "preserve-3d",
-                    zIndex: 30,
-                    clipPath: "polygon(0 0, 100% 0, 50% 100%)",
-                    background: "linear-gradient(160deg, #e9d9b8 0%, #ddc89f 100%)",
-                    borderBottom: "1px solid rgba(125,96,52,0.25)",
-                  }}
-                  initial={false}
-                  animate={{ rotateX: flapOpen ? 180 : 0 }}
-                  transition={{ duration: 0.9, ease: EASE }}
-                >
-                  {/* wax seal at the tip */}
-                  <div
-                    className="wax-seal absolute left-1/2 flex items-center justify-center rounded-full"
-                    style={{
-                      width: 46,
-                      height: 46,
-                      top: 118,
-                      transform: "translateX(-50%)",
-                    }}
-                  >
-                    <Snowflake size={22} color="#f3d9c0" strokeWidth={1.75} />
-                  </div>
-                </motion.div>
-
-                {/* the folded card peeking / sliding out from inside */}
-                <motion.div
-                  className="absolute left-1/2"
-                  style={{ width: 410, top: 40, zIndex: 20 }}
-                  initial={false}
-                  animate={
-                    cardOut
-                      ? { y: -150, x: "-50%", opacity: 1 }
-                      : { y: 14, x: "-50%", opacity: 0 }
-                  }
-                  transition={{ duration: 1.3, ease: EASE }}
-                >
-                  <FoldedFront compact />
-                </motion.div>
-              </motion.button>
-            </div>
-
-            <motion.p
-              className="font-serif-soft mt-9 text-center text-xl italic"
-              style={{ color: "var(--holly-red)" }}
-              animate={{ opacity: flapOpen ? 0 : [0.55, 1, 0.55] }}
-              transition={flapOpen ? { duration: 0.3 } : { duration: 2.4, repeat: Infinity }}
-            >
-              tap the envelope to open&hellip;
-            </motion.p>
-          </motion.div>
-        ) : (
-          /* ==================== SCENE 2 · THE FOLDED CARD ==================== */
-          <motion.div
-            key="card"
-            className="relative z-10 flex flex-col items-center px-5"
-            initial={{ opacity: 0, scale: 0.86, y: -30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.9, ease: EASE }}
-            data-testid="scene-card"
-          >
-            <div className="card-glow" />
-
-            {/* When the flap lifts it swings ~300px above the card. Reserve that room above
-                the card while open, so the whole open spread is re-centered and nothing clips. */}
+      <div className="relative z-10 flex flex-col items-center px-5">
+        {/* marginTop reserves room above: for the envelope flap, then for the card's lifting flap */}
+        <motion.div style={{ marginTop }}>
+          <div className="scale-[0.78] sm:scale-100">
+            {/* One continuous scene. Layers, bottom to top: glow, envelope back, tucked-away flap,
+                the card, envelope front, flap (while closed). The card is behind the envelope
+                front while it slides up out of it, then moves in front as it settles. */}
             <motion.div
-              className="scale-[0.82] sm:scale-100"
-              style={{ perspective: 1700, marginTop: lift }}
+              key={run}
+              className="relative isolate"
+              style={{ width: 480, height: 312 }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: EASE }}
+              data-testid="scene-envelope"
             >
-              <button
-                type="button"
-                onPointerDown={onDragStart}
-                onPointerMove={onDragMove}
-                onPointerUp={onDragEnd}
-                onPointerCancel={onDragEnd}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    toggleCard();
-                  }
-                }}
-                aria-label={cardFlat ? "Drag down to close the card" : "Drag up to open the card"}
-                data-testid="card-open-toggle"
-                className="pressable relative block select-none"
-                style={{ width: 480, height: 300, touchAction: "none", cursor: "grab" }}
+              <motion.div
+                className="absolute inset-0"
+                style={{ zIndex: 0 }}
+                initial={false}
+                animate={{ opacity: settled ? 1 : 0 }}
+                transition={{ duration: 1.2 }}
               >
+                <div className="card-glow" />
+              </motion.div>
+
+              {/* envelope back */}
+              <motion.div
+                className="envelope-shadow absolute rounded-[10px]"
+                style={{ left: 5, top: 0, width: 470, height: 312, zIndex: 1, background: ENV_BG, border: ENV_BORDER }}
+                initial={false}
+                animate={envAnim}
+                transition={ENV_EXIT}
+              />
+
+              {/* the card */}
+              <motion.div
+                className="absolute left-0"
+                style={{
+                  top: 6,
+                  width: 480,
+                  height: 300,
+                  zIndex: settled ? 4 : 2,
+                  pointerEvents: step === "card" ? "auto" : "none",
+                }}
+                initial={false}
+                animate={
+                  settled
+                    ? { opacity: 1, scale: 1, y: 0 }
+                    : cardOut
+                      ? { opacity: 1, scale: 0.8, y: -140 }
+                      : { opacity: 0, scale: 0.8, y: 30 }
+                }
+                transition={{ opacity: { duration: 0.15 }, default: { duration: settled ? 1.05 : 0.95, ease: EASE } }}
+                data-testid="scene-card"
+              >
+                <div style={{ perspective: 1700 }}>
+                  <button
+                    type="button"
+                    onPointerDown={onDragStart}
+                    onPointerMove={onDragMove}
+                    onPointerUp={onDragEnd}
+                    onPointerCancel={onDragEnd}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleCard();
+                      }
+                    }}
+                    aria-label={cardFlat ? "Drag down to close the card" : "Drag up to open the card"}
+                    data-testid="card-open-toggle"
+                    className="pressable relative block select-none"
+                    style={{ width: 480, height: 300, touchAction: "none", cursor: "grab" }}
+                  >
                 {/* lower panel = inside with the letter (revealed when flap lifts) */}
                 <div
                   className="card-face absolute inset-x-0 bottom-0 rounded-[12px] overflow-hidden"
@@ -410,56 +333,164 @@ export default function ChristmasCard() {
                     />
                   </div>
                 </motion.div>
-              </button>
-            </motion.div>
+                  </button>
+                </div>
+              </motion.div>
 
-            {/* hint + replay */}
-            <div className="mt-8 flex flex-col items-center gap-3 text-center">
-              <AnimatePresence mode="wait">
-                {!cardFlat ? (
-                  <motion.div
-                    key="open-hint"
-                    data-testid="card-open-hint"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: [0, -4, 0] }}
-                    exit={{ opacity: 0 }}
-                    transition={{ y: { duration: 1.8, repeat: Infinity }, opacity: { duration: 0.4 } }}
-                    className="inline-flex items-center gap-2 font-serif-soft text-lg italic"
+              {/* envelope front: address, stamp, seams. Opaque, so the card hides behind it. */}
+              <motion.button
+                type="button"
+                onClick={openEnvelope}
+                aria-label="Open the envelope"
+                data-testid="envelope-open"
+                className="pressable absolute block overflow-hidden rounded-[10px]"
+                style={{
+                  left: 5,
+                  top: 0,
+                  width: 470,
+                  height: 312,
+                  zIndex: 3,
+                  background: ENV_BG,
+                  border: ENV_BORDER,
+                  pointerEvents: step === "sealed" && !flapOpen ? "auto" : "none",
+                }}
+                initial={false}
+                animate={envAnim}
+                whileHover={!flapOpen ? { y: -5 } : {}}
+                transition={ENV_EXIT}
+              >
+                <div
+                  className="absolute inset-x-0 bottom-0"
+                  style={{
+                    height: "62%",
+                    background: "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(125,96,52,0.06))",
+                    clipPath: "polygon(0 42%, 50% 0, 100% 42%, 100% 100%, 0 100%)",
+                    borderTop: "1px solid rgba(125,96,52,0.18)",
+                  }}
+                />
+                <div className="absolute left-6 bottom-5">
+                  <span className="smallcaps" style={{ fontSize: 8.5, color: "#8a7a55" }}>
+                    The New Yorker &middot; Holiday Issue
+                  </span>
+                </div>
+                <div className="absolute right-5 top-5 w-[92px]">
+                  <div className="stamp">
+                    <img
+                      src={stampImg}
+                      alt="Typewriter postage stamp"
+                      className="w-full h-[104px] object-cover"
+                      draggable={false}
+                    />
+                  </div>
+                  <div
+                    className="mt-1 text-center font-type text-[9px] tracking-widest"
                     style={{ color: "var(--holly-red)" }}
                   >
-                    <ChevronUp size={18} /> press, drag up, and let go
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="replay"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: done ? 1 : 0.0 }}
-                    transition={{ duration: 0.6 }}
-                    className="flex flex-col items-center gap-2"
-                  >
-                    <button
-                      onClick={replay}
-                      data-testid="replay-button"
-                      className="group inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition-transform duration-300 hover:scale-[1.04]"
-                      style={{
-                        color: "#fff",
-                        background: "var(--holly-red)",
-                        boxShadow: "0 12px 24px -10px rgba(178,34,49,0.7)",
-                      }}
-                    >
-                      <RotateCcw size={16} className="transition-transform duration-500 group-hover:-rotate-180" />
-                      Seal it up again
-                    </button>
-                    <p className="font-serif-soft text-sm italic" style={{ color: "#8a8372" }}>
-                      &hellip; or refresh to start over
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                    NORTH POLE &middot; DEC 25
+                  </div>
+                </div>
+                <div className="absolute left-7 top-[46%] -translate-y-1/2 text-left">
+                  <p className="handwriting text-sm" style={{ color: "#8a7a55" }}>
+                    to my dearest
+                  </p>
+                  <p className="handwriting text-3xl leading-tight" style={{ color: "var(--ink)" }}>
+                    sister
+                  </p>
+                  <div
+                    className="mt-1 h-px w-40"
+                    style={{ background: "linear-gradient(90deg, var(--holly-red), transparent)" }}
+                  />
+                </div>
+              </motion.button>
+
+              {/* envelope flap: above the card while closed, tucked behind it once open */}
+              <motion.div
+                onClick={openEnvelope}
+                className="absolute"
+                style={{
+                  left: 5,
+                  top: 0,
+                  width: 470,
+                  height: 182,
+                  transformOrigin: "top center",
+                  transformPerspective: 1100,
+                  zIndex: flapBehind ? 1 : 5,
+                  clipPath: "polygon(0 0, 100% 0, 50% 100%)",
+                  background: "linear-gradient(160deg, #e9d9b8 0%, #ddc89f 100%)",
+                  cursor: step === "sealed" && !flapOpen ? "pointer" : "default",
+                  pointerEvents: step === "sealed" && !flapOpen ? "auto" : "none",
+                }}
+                initial={false}
+                animate={{ rotateX: flapOpen ? 180 : 0, ...envAnim }}
+                transition={{ rotateX: { duration: 0.55, ease: EASE }, default: ENV_EXIT }}
+              >
+                <div
+                  className="wax-seal absolute left-1/2 flex items-center justify-center rounded-full"
+                  style={{ width: 46, height: 46, top: 118, transform: "translateX(-50%)" }}
+                >
+                  <Snowflake size={22} color="#f3d9c0" strokeWidth={1.75} />
+                </div>
+              </motion.div>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* hint + replay */}
+        <div className="mt-8 flex min-h-[96px] flex-col items-center gap-3 text-center">
+          <AnimatePresence mode="wait">
+            {step === "sealed" ? (
+              <motion.p
+                key="seal-hint"
+                className="font-serif-soft text-center text-xl italic"
+                style={{ color: "var(--holly-red)" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: flapOpen ? 0 : [0.55, 1, 0.55] }}
+                transition={flapOpen ? { duration: 0.3 } : { duration: 2.4, repeat: Infinity }}
+              >
+                tap the envelope to open&hellip;
+              </motion.p>
+            ) : !cardFlat ? (
+              <motion.div
+                key="open-hint"
+                data-testid="card-open-hint"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: [0, -4, 0] }}
+                exit={{ opacity: 0 }}
+                transition={{ y: { duration: 1.8, repeat: Infinity }, opacity: { duration: 0.4 } }}
+                className="inline-flex items-center gap-2 font-serif-soft text-lg italic"
+                style={{ color: "var(--holly-red)" }}
+              >
+                <ChevronUp size={18} /> press, drag up, and let go
+              </motion.div>
+            ) : (
+              <motion.div
+                key="replay"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: done ? 1 : 0.0 }}
+                transition={{ duration: 0.6 }}
+                className="flex flex-col items-center gap-2"
+              >
+                <button
+                  onClick={replay}
+                  data-testid="replay-button"
+                  className="group inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition-transform duration-300 hover:scale-[1.04]"
+                  style={{
+                    color: "#fff",
+                    background: "var(--holly-red)",
+                    boxShadow: "0 12px 24px -10px rgba(178,34,49,0.7)",
+                  }}
+                >
+                  <RotateCcw size={16} className="transition-transform duration-500 group-hover:-rotate-180" />
+                  Seal it up again
+                </button>
+                <p className="font-serif-soft text-sm italic" style={{ color: "#8a8372" }}>
+                  &hellip; or refresh to start over
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }
