@@ -142,8 +142,7 @@
 
 /* the same glint, sweeping across the wax seal */
 .foil-seal {
-  position: relative;
-  overflow: hidden;
+  overflow: hidden; /* the seal is already position:absolute, which anchors the glint */
 }
 .foil-seal::after {
   content: "";

@@ -168,7 +168,7 @@ export default function ChristmasCard() {
   return (
     <div className="stage" style={{ paddingTop: pad, height: "100vh" }} data-testid="card-stage">
       <Snow count={50} swell={cardFlat} />
-      <Music play={flapOpen} />
+      <Music />
       <Surprise show={step === "card"} />
 
       {/* page masthead, centered across the top of the page */}

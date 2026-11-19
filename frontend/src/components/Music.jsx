@@ -9,14 +9,16 @@ const VIDEO_ID = "2Kw8g6PjnvA";
 const VOLUME = 18; // 0 to 100, kept low on purpose
 const YT_ORIGIN = "https://www.youtube-nocookie.com";
 
-// Starts when `play` turns true (the envelope click counts as the tap browsers need).
-// Shows a small speaker button to mute / unmute. If YouTube refuses to play the video,
-// the button just never appears.
-export default function Music({ play }) {
+// The song starts as soon as the page opens or reloads. Browsers do not allow sound before
+// the visitor has clicked, tapped or pressed a key, so it starts muted and becomes audible on
+// the very first click / tap / key press (opening the envelope counts). A small speaker
+// button mutes and unmutes it. If YouTube refuses to play the video, the button disappears.
+export default function Music() {
   const frame = useRef(null);
   const attempts = useRef(0);
   const [loaded, setLoaded] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [unlocked, setUnlocked] = useState(false); // the visitor has interacted with the page
+  const [userMuted, setUserMuted] = useState(false);
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
 
@@ -24,8 +26,20 @@ export default function Music({ play }) {
     try {
       frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
     } catch (e) {
-      /* the player is not ready yet; the retry loop below tries again */
+      /* the player is not ready yet; the effects below ask again */
     }
+  }, []);
+
+  // first click / tap / key press anywhere unlocks the sound (except on the speaker button,
+  // which handles itself)
+  useEffect(() => {
+    const unlock = (e) => {
+      if (e.target?.closest?.("[data-music-toggle]")) return;
+      setUnlocked(true);
+    };
+    const events = ["pointerdown", "keydown", "touchstart"];
+    events.forEach((ev) => window.addEventListener(ev, unlock, { passive: true }));
+    return () => events.forEach((ev) => window.removeEventListener(ev, unlock));
   }, []);
 
   // listen to the player so we know whether it is really playing, or was refused
@@ -46,17 +60,11 @@ export default function Music({ play }) {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
+  // make sure it is playing (the player needs a moment before it listens, so ask a few times)
   useEffect(() => {
-    if (!loaded || failed) return undefined;
-    if (!play || muted) {
-      if (playing) send("pauseVideo");
-      return undefined;
-    }
-    if (playing) return undefined;
-    // the player needs a moment before it listens: ask a few times until it is playing
+    if (!loaded || failed || playing) return undefined;
     attempts.current = 0;
     const ask = () => {
-      send("setVolume", [VOLUME]);
       send("playVideo");
       attempts.current += 1;
     };
@@ -66,26 +74,35 @@ export default function Music({ play }) {
       else ask();
     }, 900);
     return () => clearInterval(id);
-  }, [loaded, play, muted, failed, playing, send]);
+  }, [loaded, failed, playing, send]);
 
-  const onClick = () => {
-    if (!playing) {
-      setMuted(false);
+  // sound on or off
+  useEffect(() => {
+    if (!loaded || failed) return;
+    if (unlocked && !userMuted) {
+      send("unMute");
       send("setVolume", [VOLUME]);
-      send("playVideo");
     } else {
-      setMuted((m) => !m);
+      send("mute");
+    }
+  }, [loaded, failed, playing, unlocked, userMuted, send]);
+
+  const audible = unlocked && !userMuted && playing;
+
+  const onToggle = () => {
+    if (!audible) {
+      setUnlocked(true);
+      setUserMuted(false);
+    } else {
+      setUserMuted(true);
     }
   };
 
-  const src =
-    `${YT_ORIGIN}/embed/${VIDEO_ID}?enablejsapi=1&controls=0&loop=1&playlist=${VIDEO_ID}` +
-    `&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
-
   if (failed) return null;
 
-  const showButton = play;
-  const soundOn = playing && !muted;
+  const src =
+    `${YT_ORIGIN}/embed/${VIDEO_ID}?enablejsapi=1&autoplay=1&mute=1&controls=0&loop=1&playlist=${VIDEO_ID}` +
+    `&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
 
   return (
     <>
@@ -114,24 +131,23 @@ export default function Music({ play }) {
           pointerEvents: "none",
         }}
       />
-      {showButton && (
-        <button
-          type="button"
-          onClick={onClick}
-          aria-label={soundOn ? "Mute the music" : "Play the music"}
-          data-testid="music-toggle"
-          className="fixed right-4 top-4 z-[45] flex h-10 w-10 items-center justify-center rounded-full transition-transform duration-300 hover:scale-110"
-          style={{
-            background: "#fbf6ea",
-            color: "var(--holly-red)",
-            border: "1px solid rgba(201,162,75,0.6)",
-            boxShadow: "0 8px 18px -10px rgba(43,42,38,0.5)",
-            outline: "none",
-          }}
-        >
-          {soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onToggle}
+        data-music-toggle
+        aria-label={audible ? "Mute the music" : "Turn the music on"}
+        data-testid="music-toggle"
+        className="fixed right-4 top-4 z-[45] flex h-10 w-10 items-center justify-center rounded-full transition-transform duration-300 hover:scale-110"
+        style={{
+          background: "#fbf6ea",
+          color: "var(--holly-red)",
+          border: "1px solid rgba(201,162,75,0.6)",
+          boxShadow: "0 8px 18px -10px rgba(43,42,38,0.5)",
+          outline: "none",
+        }}
+      >
+        {audible ? <Volume2 size={18} /> : <VolumeX size={18} />}
+      </button>
     </>
   );
 }
