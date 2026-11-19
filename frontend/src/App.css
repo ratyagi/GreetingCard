@@ -82,19 +82,82 @@
   50% { opacity: 0; }
 }
 
-/* gentle breathing glow behind the card */
+/* warm candlelight behind the card: a soft amber glow that flickers a little */
 .card-glow {
   position: absolute;
   inset: -14% -14%;
   z-index: -1;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(201,162,75,0.28) 0%, rgba(178,34,49,0.10) 42%, transparent 70%);
+  background: radial-gradient(
+    circle,
+    rgba(240, 180, 84, 0.36) 0%,
+    rgba(214, 140, 66, 0.16) 40%,
+    rgba(178, 34, 49, 0.06) 56%,
+    transparent 70%
+  );
   filter: blur(10px);
-  animation: breathe 5.5s ease-in-out infinite;
+  animation: candle 4.6s ease-in-out infinite;
 }
-@keyframes breathe {
-  0%, 100% { transform: scale(0.96); opacity: 0.75; }
-  50% { transform: scale(1.06); opacity: 1; }
+@keyframes candle {
+  0%   { transform: scale(0.97); opacity: 0.8; }
+  6%   { transform: scale(1.02); opacity: 0.95; }
+  12%  { transform: scale(0.99); opacity: 0.83; }
+  21%  { transform: scale(1.04); opacity: 1; }
+  29%  { transform: scale(1.0);  opacity: 0.86; }
+  38%  { transform: scale(1.03); opacity: 0.97; }
+  47%  { transform: scale(0.98); opacity: 0.8; }
+  58%  { transform: scale(1.05); opacity: 1; }
+  66%  { transform: scale(1.01); opacity: 0.88; }
+  77%  { transform: scale(1.04); opacity: 0.96; }
+  86%  { transform: scale(0.99); opacity: 0.82; }
+  94%  { transform: scale(1.02); opacity: 0.93; }
+  100% { transform: scale(0.97); opacity: 0.8; }
+}
+
+/* gold foil: a slow golden glint that sweeps across the text, then rests for a while */
+.foil-text {
+  background-image: linear-gradient(
+    105deg,
+    var(--foil-base) 0%,
+    var(--foil-base) 40%,
+    #d9ae4a 46%,
+    #fbe9a6 50%,
+    #d9ae4a 54%,
+    var(--foil-base) 60%,
+    var(--foil-base) 100%
+  );
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: foil-sweep 8s ease-in-out infinite;
+}
+@keyframes foil-sweep {
+  0%   { background-position: 130% 0; }
+  45%  { background-position: -30% 0; }
+  100% { background-position: -30% 0; }
+}
+
+/* the same glint, sweeping across the wax seal */
+.foil-seal {
+  position: relative;
+  overflow: hidden;
+}
+.foil-seal::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 42%, rgba(255, 233, 160, 0.6) 50%, transparent 58%);
+  transform: translateX(-130%);
+  animation: seal-sweep 8s ease-in-out infinite 1.2s;
+}
+@keyframes seal-sweep {
+  0%   { transform: translateX(-130%); }
+  35%  { transform: translateX(130%); }
+  100% { transform: translateX(130%); }
 }
 
 /* card paper edges */
@@ -105,7 +168,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flake, .card-glow, .caret { animation: none !important; }
+  .flake, .card-glow, .caret, .foil-text, .foil-seal::after { animation: none !important; }
 }
 
 /* ===== Envelope ===== */

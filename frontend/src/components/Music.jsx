@@ -1,0 +1,137 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
+
+/* ---- The music (editable) ----
+   Faouzia - Fur Elise (Live Performance), her official upload.
+   It plays through a tiny hidden YouTube player, so nothing is copied into this project.
+   Change VIDEO_ID to use a different video. */
+const VIDEO_ID = "2Kw8g6PjnvA";
+const VOLUME = 18; // 0 to 100, kept low on purpose
+const YT_ORIGIN = "https://www.youtube-nocookie.com";
+
+// Starts when `play` turns true (the envelope click counts as the tap browsers need).
+// Shows a small speaker button to mute / unmute. If YouTube refuses to play the video,
+// the button just never appears.
+export default function Music({ play }) {
+  const frame = useRef(null);
+  const attempts = useRef(0);
+  const [loaded, setLoaded] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [playing, setPlaying] = useState(false);
+
+  const send = useCallback((func, args = []) => {
+    try {
+      frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
+    } catch (e) {
+      /* the player is not ready yet; the retry loop below tries again */
+    }
+  }, []);
+
+  // listen to the player so we know whether it is really playing, or was refused
+  useEffect(() => {
+    const onMessage = (e) => {
+      if (e.origin !== YT_ORIGIN || typeof e.data !== "string") return;
+      let data;
+      try {
+        data = JSON.parse(e.data);
+      } catch (err) {
+        return;
+      }
+      if (data.event === "onError") setFailed(true);
+      const state = data.event === "onStateChange" ? data.info : data.info?.playerState;
+      if (typeof state === "number") setPlaying(state === 1);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
+    if (!loaded || failed) return undefined;
+    if (!play || muted) {
+      if (playing) send("pauseVideo");
+      return undefined;
+    }
+    if (playing) return undefined;
+    // the player needs a moment before it listens: ask a few times until it is playing
+    attempts.current = 0;
+    const ask = () => {
+      send("setVolume", [VOLUME]);
+      send("playVideo");
+      attempts.current += 1;
+    };
+    ask();
+    const id = setInterval(() => {
+      if (attempts.current >= 10) clearInterval(id);
+      else ask();
+    }, 900);
+    return () => clearInterval(id);
+  }, [loaded, play, muted, failed, playing, send]);
+
+  const onClick = () => {
+    if (!playing) {
+      setMuted(false);
+      send("setVolume", [VOLUME]);
+      send("playVideo");
+    } else {
+      setMuted((m) => !m);
+    }
+  };
+
+  const src =
+    `${YT_ORIGIN}/embed/${VIDEO_ID}?enablejsapi=1&controls=0&loop=1&playlist=${VIDEO_ID}` +
+    `&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+
+  if (failed) return null;
+
+  const showButton = play;
+  const soundOn = playing && !muted;
+
+  return (
+    <>
+      <iframe
+        ref={frame}
+        title="Background music"
+        src={src}
+        allow="autoplay; encrypted-media"
+        tabIndex={-1}
+        aria-hidden="true"
+        onLoad={() => {
+          setLoaded(true);
+          frame.current?.contentWindow?.postMessage(
+            JSON.stringify({ event: "listening", id: 1, channel: "widget" }),
+            "*",
+          );
+        }}
+        style={{
+          position: "fixed",
+          left: -20,
+          bottom: -20,
+          width: 2,
+          height: 2,
+          border: 0,
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
+      {showButton && (
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={soundOn ? "Mute the music" : "Play the music"}
+          data-testid="music-toggle"
+          className="fixed right-4 top-4 z-[45] flex h-10 w-10 items-center justify-center rounded-full transition-transform duration-300 hover:scale-110"
+          style={{
+            background: "#fbf6ea",
+            color: "var(--holly-red)",
+            border: "1px solid rgba(201,162,75,0.6)",
+            boxShadow: "0 8px 18px -10px rgba(43,42,38,0.5)",
+            outline: "none",
+          }}
+        >
+          {soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
+        </button>
+      )}
+    </>
+  );
+}
