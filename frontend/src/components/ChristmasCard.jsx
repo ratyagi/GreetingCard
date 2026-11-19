@@ -657,7 +657,7 @@ function FoldedFront({ compact = false }) {
         </span>
         <span
           className="ny-caption"
-          style={{ fontSize: compact ? 12 : 15, color: "var(--holly-red)" }}
+          style={{ fontSize: compact ? 12 : 15, color: "var(--ink)" }}
         >
           open me &hearts;
         </span>
