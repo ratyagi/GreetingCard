@@ -3,7 +3,6 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "
 import { Snowflake, RotateCcw, ChevronUp } from "lucide-react";
 import Snow from "@/components/Snow";
 import Music from "@/components/Music";
-import Surprise from "@/components/Surprise";
 import stampImg from "@/assets/typewriter_art.png";
 import coupleImg from "@/assets/couple_art.jpg";
 import sealImg from "@/assets/seal.png";
@@ -170,7 +169,6 @@ export default function ChristmasCard() {
     <div className="stage" style={{ paddingTop: pad, height: "100vh" }} data-testid="card-stage">
       <Snow count={50} swell={cardFlat} />
       <Music />
-      <Surprise show={step === "card"} />
 
       {/* page masthead, centered across the top of the page */}
       <header
