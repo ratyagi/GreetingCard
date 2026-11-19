@@ -529,7 +529,7 @@ export default function ChristmasCard() {
                 {/* inside of the flap, seen once it is open */}
                 <div
                   className="absolute inset-0"
-                  style={{ backfaceVisibility: "hidden", transform: "rotateX(180deg)" }}
+                  style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
                 >
                   <svg width="470" height="186" viewBox="0 0 470 186" aria-hidden="true">
                     <defs>
