@@ -38,9 +38,16 @@ export default function ChristmasCard() {
   const flapRot = useMotionValue(0);
   const lift = useTransform(flapRot, [0, OPEN_DEG], [0, 300]);
   const reserve = useMotionValue(0); // room for the envelope flap while it is open
-  const fitMV = useMotionValue(1);
-  const marginTop = useTransform([reserve, lift, fitMV], ([r, l, f]) => Math.max(r, l) * f);
-  const [fit, setFit] = useState(1); // shrink on short / narrow screens so the open card fits
+  // Normal size by default. It only shrinks when the window is too short for the open card
+  // (flap + card) or too narrow, so nothing runs into the page title or off screen.
+  const availMV = useMotionValue(700); // window height minus the title area
+  const widthFit = useMotionValue(1);
+  const scaleMV = useTransform([reserve, lift, availMV, widthFit], ([r, l, av, w]) =>
+    Math.max(0.5, Math.min(1, w, (av - 128) / (Math.max(r, l) + 312))),
+  );
+  const marginTop = useTransform([reserve, lift, scaleMV], ([r, l, sc]) => Math.max(r, l) * sc);
+  const boxW = useTransform(scaleMV, (sc) => 480 * sc);
+  const boxH = useTransform(scaleMV, (sc) => 312 * sc);
   const [pad, setPad] = useState(150); // room kept for the page title
   const drag = useRef({ active: false, startY: 0, startRot: 0, moved: false });
 
@@ -49,16 +56,14 @@ export default function ChristmasCard() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const p = vw >= 640 ? 150 : 112;
-      // open card = 300px card + 300px flap, plus the hint / replay area underneath
-      const f = Math.max(0.5, Math.min(1, (vh - p - 152) / 600, (vw - 40) / 480));
       setPad(p);
-      setFit(f);
-      fitMV.set(f);
+      availMV.set(vh - p - 16);
+      widthFit.set(Math.min(1, (vw - 40) / 480));
     };
     calc();
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
-  }, [fitMV]);
+  }, [availMV, widthFit]);
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -76,7 +81,7 @@ export default function ChristmasCard() {
       setSettled(true); // card moves forward to the centre, envelope sinks away
       animate(reserve, 0, { duration: 1.1, ease: EASE });
     }, 1650);
-    later(() => setStep("card"), 2750);
+    later(() => setStep("card"), 2250);
   }, [step, flapOpen, reserve]);
 
   const toggleCard = useCallback(() => {
@@ -159,7 +164,7 @@ export default function ChristmasCard() {
   const envAnim = settled ? { opacity: 0, y: 90 } : { opacity: 1, y: 0 };
 
   return (
-    <div className="stage" style={{ paddingTop: pad }} data-testid="card-stage">
+    <div className="stage" style={{ paddingTop: pad, height: "100vh" }} data-testid="card-stage">
       <Snow count={50} />
 
       {/* page masthead, centered across the top of the page */}
@@ -187,8 +192,8 @@ export default function ChristmasCard() {
       <div className="relative z-10 flex flex-col items-center px-5">
         {/* marginTop reserves room above: for the envelope flap, then for the card's lifting flap */}
         <motion.div style={{ marginTop }}>
-          <div style={{ width: 480 * fit, height: 312 * fit }}>
-           <div style={{ width: 480, height: 312, transform: `scale(${fit})`, transformOrigin: "top left" }}>
+          <motion.div style={{ width: boxW, height: boxH }}>
+           <motion.div style={{ width: 480, height: 312, scale: scaleMV, originX: 0, originY: 0 }}>
             {/* One continuous scene. Layers, bottom to top: glow, envelope back, tucked-away flap,
                 the card, envelope front, flap (while closed). The card is behind the envelope
                 front while it slides up out of it, then moves in front as it settles. */}
@@ -278,7 +283,7 @@ export default function ChristmasCard() {
                     aria-label={cardFlat ? "Drag down to close the card" : "Drag up to open the card"}
                     data-testid="card-open-toggle"
                     className="pressable relative block select-none"
-                    style={{ width: 480, height: 300, touchAction: "none", cursor: "grab" }}
+                    style={{ width: 480, height: 300, touchAction: "none", cursor: "grab", outline: "none" }}
                   >
                 {/* lower panel = inside with the letter (revealed when flap lifts) */}
                 <div
@@ -387,6 +392,7 @@ export default function ChristmasCard() {
                 data-testid="envelope-open"
                 className="pressable absolute block overflow-hidden rounded-[10px]"
                 style={{
+                  outline: "none",
                   left: 5,
                   top: 0,
                   width: 470,
@@ -396,7 +402,6 @@ export default function ChristmasCard() {
                 }}
                 initial={false}
                 animate={envAnim}
-                whileHover={!flapOpen ? { y: -5 } : {}}
                 transition={ENV_EXIT}
               >
                 <svg width="470" height="312" viewBox="0 0 470 312" className="absolute inset-0" aria-hidden="true">
@@ -550,8 +555,8 @@ export default function ChristmasCard() {
                 </div>
               </motion.div>
             </motion.div>
-           </div>
-          </div>
+           </motion.div>
+          </motion.div>
         </motion.div>
 
         {/* hint + replay */}
