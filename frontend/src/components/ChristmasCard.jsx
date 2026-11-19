@@ -38,8 +38,27 @@ export default function ChristmasCard() {
   const flapRot = useMotionValue(0);
   const lift = useTransform(flapRot, [0, OPEN_DEG], [0, 300]);
   const reserve = useMotionValue(0); // room for the envelope flap while it is open
-  const marginTop = useTransform([reserve, lift], ([r, l]) => Math.max(r, l));
+  const fitMV = useMotionValue(1);
+  const marginTop = useTransform([reserve, lift, fitMV], ([r, l, f]) => Math.max(r, l) * f);
+  const [fit, setFit] = useState(1); // shrink on short / narrow screens so the open card fits
+  const [pad, setPad] = useState(150); // room kept for the page title
   const drag = useRef({ active: false, startY: 0, startRot: 0, moved: false });
+
+  useEffect(() => {
+    const calc = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const p = vw >= 640 ? 150 : 112;
+      // open card = 300px card + 300px flap, plus the hint / replay area underneath
+      const f = Math.max(0.5, Math.min(1, (vh - p - 152) / 600, (vw - 40) / 480));
+      setPad(p);
+      setFit(f);
+      fitMV.set(f);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, [fitMV]);
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -140,7 +159,7 @@ export default function ChristmasCard() {
   const envAnim = settled ? { opacity: 0, y: 90 } : { opacity: 1, y: 0 };
 
   return (
-    <div className="stage pt-[104px] sm:pt-[120px]" data-testid="card-stage">
+    <div className="stage" style={{ paddingTop: pad }} data-testid="card-stage">
       <Snow count={50} />
 
       {/* page masthead, centered across the top of the page */}
@@ -168,7 +187,8 @@ export default function ChristmasCard() {
       <div className="relative z-10 flex flex-col items-center px-5">
         {/* marginTop reserves room above: for the envelope flap, then for the card's lifting flap */}
         <motion.div style={{ marginTop }}>
-          <div className="scale-[0.78] sm:scale-100">
+          <div style={{ width: 480 * fit, height: 312 * fit }}>
+           <div style={{ width: 480, height: 312, transform: `scale(${fit})`, transformOrigin: "top left" }}>
             {/* One continuous scene. Layers, bottom to top: glow, envelope back, tucked-away flap,
                 the card, envelope front, flap (while closed). The card is behind the envelope
                 front while it slides up out of it, then moves in front as it settles. */}
@@ -191,14 +211,35 @@ export default function ChristmasCard() {
                 <div className="card-glow" />
               </motion.div>
 
-              {/* envelope back */}
+              {/* envelope back: the patterned lining you see through the opening */}
               <motion.div
-                className="envelope-shadow absolute rounded-[10px]"
-                style={{ left: 5, top: 0, width: 470, height: 312, zIndex: 1, background: ENV_BG, border: ENV_BORDER }}
+                className="envelope-shadow absolute overflow-hidden rounded-[10px]"
+                style={{
+                  left: 5,
+                  top: 0,
+                  width: 470,
+                  height: 312,
+                  zIndex: 1,
+                  background: "linear-gradient(180deg, #e2d0a8 0%, #ead9b6 100%)",
+                  border: ENV_BORDER,
+                }}
                 initial={false}
                 animate={envAnim}
                 transition={ENV_EXIT}
-              />
+              >
+                <svg width="470" height="312" className="absolute inset-0" aria-hidden="true">
+                  <defs>
+                    <pattern id="liner-back" width="24" height="24" patternUnits="userSpaceOnUse">
+                      <path d="M12 6 L15 12 L12 18 L9 12 Z" fill="rgba(178,34,49,0.10)" />
+                      <circle cx="0" cy="0" r="1.3" fill="rgba(201,162,75,0.35)" />
+                      <circle cx="24" cy="0" r="1.3" fill="rgba(201,162,75,0.35)" />
+                      <circle cx="0" cy="24" r="1.3" fill="rgba(201,162,75,0.35)" />
+                      <circle cx="24" cy="24" r="1.3" fill="rgba(201,162,75,0.35)" />
+                    </pattern>
+                  </defs>
+                  <rect width="470" height="312" fill="url(#liner-back)" />
+                </svg>
+              </motion.div>
 
               {/* the card */}
               <motion.div
@@ -215,7 +256,7 @@ export default function ChristmasCard() {
                   settled
                     ? { opacity: 1, scale: 1, y: 0 }
                     : cardOut
-                      ? { opacity: 1, scale: 0.8, y: -140 }
+                      ? { opacity: 1, scale: 0.8, y: -120 }
                       : { opacity: 0, scale: 0.8, y: 30 }
                 }
                 transition={{ opacity: { duration: 0.15 }, default: { duration: settled ? 1.05 : 0.95, ease: EASE } }}
@@ -337,7 +378,8 @@ export default function ChristmasCard() {
                 </div>
               </motion.div>
 
-              {/* envelope front: address, stamp, seams. Opaque, so the card hides behind it. */}
+              {/* envelope front: two side flaps and the bottom flap, with the opening between them.
+                  The card slides up behind these, through the opening. */}
               <motion.button
                 type="button"
                 onClick={openEnvelope}
@@ -350,8 +392,6 @@ export default function ChristmasCard() {
                   width: 470,
                   height: 312,
                   zIndex: 3,
-                  background: ENV_BG,
-                  border: ENV_BORDER,
                   pointerEvents: step === "sealed" && !flapOpen ? "auto" : "none",
                 }}
                 initial={false}
@@ -359,51 +399,72 @@ export default function ChristmasCard() {
                 whileHover={!flapOpen ? { y: -5 } : {}}
                 transition={ENV_EXIT}
               >
-                <div
-                  className="absolute inset-x-0 bottom-0"
-                  style={{
-                    height: "62%",
-                    background: "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(125,96,52,0.06))",
-                    clipPath: "polygon(0 42%, 50% 0, 100% 42%, 100% 100%, 0 100%)",
-                    borderTop: "1px solid rgba(125,96,52,0.18)",
-                  }}
-                />
-                <div className="absolute left-6 bottom-5">
+                <svg width="470" height="312" viewBox="0 0 470 312" className="absolute inset-0" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="fl-left" x1="0" y1="0" x2="1" y2="0.3">
+                      <stop offset="0" stopColor="#e2cfa8" />
+                      <stop offset="1" stopColor="#ebddbc" />
+                    </linearGradient>
+                    <linearGradient id="fl-right" x1="1" y1="0" x2="0" y2="0.3">
+                      <stop offset="0" stopColor="#dcc99f" />
+                      <stop offset="1" stopColor="#e8d9b7" />
+                    </linearGradient>
+                    <linearGradient id="fl-bottom" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor="#f2e7cc" />
+                      <stop offset="1" stopColor="#e6d4ae" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M0 0 L235 150 L0 312 Z" fill="url(#fl-left)" />
+                  <path d="M470 0 L235 150 L470 312 Z" fill="url(#fl-right)" />
+                  <path d="M0 0 L235 150 L470 0" fill="none" stroke="rgba(125,96,52,0.34)" strokeWidth="1" />
+                  {/* soft shadow the bottom flap throws on the side flaps */}
+                  <path
+                    d="M0 312 L235 138 L470 312"
+                    fill="none"
+                    stroke="rgba(90,66,30,0.18)"
+                    strokeWidth="7"
+                    style={{ filter: "blur(3px)" }}
+                  />
+                  <path d="M0 312 L235 138 L470 312 Z" fill="url(#fl-bottom)" />
+                  <path d="M0 312 L235 138 L470 312" fill="none" stroke="rgba(125,96,52,0.38)" strokeWidth="1" />
+                  <path d="M0 313.5 L235 139.5 L470 313.5" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1" />
+                  {/* outer edge (top edge is left open so the card can slide out) */}
+                  <path
+                    d="M10.5 0.5 Q0.5 0.5 0.5 10.5 V301.5 Q0.5 311.5 10.5 311.5 H459.5 Q469.5 311.5 469.5 301.5 V10.5 Q469.5 0.5 459.5 0.5"
+                    fill="none"
+                    stroke="rgba(125,96,52,0.3)"
+                    strokeWidth="1"
+                  />
+                </svg>
+
+                <div className="absolute inset-x-0 bottom-4 text-center">
                   <span className="smallcaps" style={{ fontSize: 8.5, color: "#8a7a55" }}>
                     The New Yorker &middot; Holiday Issue
                   </span>
                 </div>
-                <div className="absolute right-5 top-5 w-[92px]">
-                  <div className="stamp">
+
+                {/* stamp + postmark, stuck on the bottom flap */}
+                <div className="absolute right-4 bottom-3 w-[84px] text-center" style={{ transform: "rotate(3deg)" }}>
+                  <div className="stamp mx-auto w-[58px]">
                     <img
                       src={stampImg}
                       alt="Typewriter postage stamp"
-                      className="w-full h-[104px] object-cover"
+                      className="w-full h-[66px] object-cover"
                       draggable={false}
                     />
                   </div>
                   <div
-                    className="mt-1 text-center font-type text-[9px] tracking-widest"
+                    className="mt-1 font-type text-[8px] leading-[1.25] tracking-widest"
                     style={{ color: "var(--holly-red)" }}
                   >
-                    NORTH POLE &middot; DEC 25
+                    NORTH POLE
+                    <br />
+                    DEC 25
                   </div>
-                </div>
-                <div className="absolute left-7 top-[46%] -translate-y-1/2 text-left">
-                  <p className="handwriting text-sm" style={{ color: "#8a7a55" }}>
-                    to my dearest
-                  </p>
-                  <p className="handwriting text-3xl leading-tight" style={{ color: "var(--ink)" }}>
-                    sister
-                  </p>
-                  <div
-                    className="mt-1 h-px w-40"
-                    style={{ background: "linear-gradient(90deg, var(--holly-red), transparent)" }}
-                  />
                 </div>
               </motion.button>
 
-              {/* envelope flap: above the card while closed, tucked behind it once open */}
+              {/* envelope flap: closed over the opening; lifts up and tucks behind the card */}
               <motion.div
                 onClick={openEnvelope}
                 className="absolute"
@@ -411,12 +472,11 @@ export default function ChristmasCard() {
                   left: 5,
                   top: 0,
                   width: 470,
-                  height: 182,
+                  height: 186,
                   transformOrigin: "top center",
                   transformPerspective: 1100,
+                  transformStyle: "preserve-3d",
                   zIndex: flapBehind ? 1 : 5,
-                  clipPath: "polygon(0 0, 100% 0, 50% 100%)",
-                  background: "linear-gradient(160deg, #e9d9b8 0%, #ddc89f 100%)",
                   cursor: step === "sealed" && !flapOpen ? "pointer" : "default",
                   pointerEvents: step === "sealed" && !flapOpen ? "auto" : "none",
                 }}
@@ -424,14 +484,73 @@ export default function ChristmasCard() {
                 animate={{ rotateX: flapOpen ? 180 : 0, ...envAnim }}
                 transition={{ rotateX: { duration: 0.55, ease: EASE }, default: ENV_EXIT }}
               >
+                {/* outside of the flap, with the wax seal */}
+                <div className="absolute inset-0" style={{ backfaceVisibility: "hidden" }}>
+                  <svg
+                    width="470"
+                    height="186"
+                    viewBox="0 0 470 186"
+                    style={{ filter: "drop-shadow(0 5px 5px rgba(90,66,30,0.22))" }}
+                    aria-hidden="true"
+                  >
+                    <defs>
+                      <linearGradient id="fl-top" x1="0" y1="0" x2="0.3" y2="1">
+                        <stop offset="0" stopColor="#ecdfbf" />
+                        <stop offset="1" stopColor="#dcc89c" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M10 0.5 H460 Q470 0.5 465.5 8.5 L240 176 Q235 180 230 176 L4.5 8.5 Q0 0.5 10 0.5 Z"
+                      fill="url(#fl-top)"
+                      stroke="rgba(125,96,52,0.34)"
+                      strokeWidth="1"
+                    />
+                    <path
+                      d="M14 5 H456 L237 169"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.45)"
+                      strokeWidth="1"
+                      strokeLinejoin="round"
+                      opacity="0.7"
+                    />
+                  </svg>
+                  <div
+                    className="wax-seal absolute left-1/2 flex items-center justify-center rounded-full"
+                    style={{ width: 46, height: 46, top: 128, transform: "translateX(-50%)" }}
+                  >
+                    <Snowflake size={22} color="#f3d9c0" strokeWidth={1.75} />
+                  </div>
+                </div>
+                {/* inside of the flap, seen once it is open */}
                 <div
-                  className="wax-seal absolute left-1/2 flex items-center justify-center rounded-full"
-                  style={{ width: 46, height: 46, top: 118, transform: "translateX(-50%)" }}
+                  className="absolute inset-0"
+                  style={{ backfaceVisibility: "hidden", transform: "rotateX(180deg)" }}
                 >
-                  <Snowflake size={22} color="#f3d9c0" strokeWidth={1.75} />
+                  <svg width="470" height="186" viewBox="0 0 470 186" aria-hidden="true">
+                    <defs>
+                      <pattern id="liner-flap" width="24" height="24" patternUnits="userSpaceOnUse">
+                        <path d="M12 6 L15 12 L12 18 L9 12 Z" fill="rgba(178,34,49,0.10)" />
+                        <circle cx="0" cy="0" r="1.3" fill="rgba(201,162,75,0.35)" />
+                        <circle cx="24" cy="0" r="1.3" fill="rgba(201,162,75,0.35)" />
+                        <circle cx="0" cy="24" r="1.3" fill="rgba(201,162,75,0.35)" />
+                        <circle cx="24" cy="24" r="1.3" fill="rgba(201,162,75,0.35)" />
+                      </pattern>
+                    </defs>
+                    <path
+                      d="M10 0.5 H460 Q470 0.5 465.5 8.5 L240 176 Q235 180 230 176 L4.5 8.5 Q0 0.5 10 0.5 Z"
+                      fill="#e9d8b3"
+                      stroke="rgba(125,96,52,0.34)"
+                      strokeWidth="1"
+                    />
+                    <path
+                      d="M10 0.5 H460 Q470 0.5 465.5 8.5 L240 176 Q235 180 230 176 L4.5 8.5 Q0 0.5 10 0.5 Z"
+                      fill="url(#liner-flap)"
+                    />
+                  </svg>
                 </div>
               </motion.div>
             </motion.div>
+           </div>
           </div>
         </motion.div>
 
