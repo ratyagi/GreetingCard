@@ -6,6 +6,7 @@ import Music from "@/components/Music";
 import Surprise from "@/components/Surprise";
 import stampImg from "@/assets/typewriter_art.png";
 import coupleImg from "@/assets/couple_art.jpg";
+import sealImg from "@/assets/seal.png";
 
 /* ---- The message (editable) ---- */
 const GREETING = "Dear Dr. Tyagi,";
@@ -524,10 +525,17 @@ export default function ChristmasCard() {
                     />
                   </svg>
                   <div
-                    className="wax-seal foil-seal absolute left-1/2 flex items-center justify-center rounded-full"
-                    style={{ width: 46, height: 46, top: 128, transform: "translateX(-50%)" }}
+                    className="foil-seal absolute left-1/2"
+                    style={{
+                      width: 62,
+                      height: 57,
+                      top: 122,
+                      transform: "translateX(-50%)",
+                      filter: "drop-shadow(0 3px 4px rgba(60,40,20,0.45))",
+                      "--seal-mask": `url(${sealImg})`,
+                    }}
                   >
-                    <Snowflake size={22} color="#f3d9c0" strokeWidth={1.75} />
+                    <img src={sealImg} alt="" className="block h-full w-full" draggable={false} />
                   </div>
                 </div>
                 {/* inside of the flap, seen once it is open */}
