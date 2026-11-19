@@ -65,6 +65,10 @@ export default function Music() {
     if (!loaded || failed || playing) return undefined;
     attempts.current = 0;
     const ask = () => {
+      frame.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "listening", id: 1, channel: "widget" }),
+        "*",
+      );
       send("playVideo");
       attempts.current += 1;
     };
@@ -82,12 +86,13 @@ export default function Music() {
     if (unlocked && !userMuted) {
       send("unMute");
       send("setVolume", [VOLUME]);
+      send("playVideo");
     } else {
       send("mute");
     }
   }, [loaded, failed, playing, unlocked, userMuted, send]);
 
-  const audible = unlocked && !userMuted && playing;
+  const audible = unlocked && !userMuted;
 
   const onToggle = () => {
     if (!audible) {
@@ -121,13 +126,16 @@ export default function Music() {
           );
         }}
         style={{
+          // YouTube needs a player of at least 200x200 that is inside the window, otherwise
+          // it may refuse to autoplay. So it sits there, but is invisible and untouchable.
           position: "fixed",
-          left: -20,
-          bottom: -20,
-          width: 2,
-          height: 2,
+          left: 0,
+          bottom: 0,
+          width: 200,
+          height: 200,
           border: 0,
-          opacity: 0,
+          opacity: 0.01,
+          zIndex: -1,
           pointerEvents: "none",
         }}
       />
