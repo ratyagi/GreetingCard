@@ -1,0 +1,191 @@
+/* ===== Digital Christmas Card ===== */
+:root {
+  --cream: #f7f1e4;
+  --cream-deep: #efe6d2;
+  --ink: #2b2a26;
+  --holly-red: #b22231;
+  --holly-red-soft: #c9414f;
+  --gold: #c9a24b;
+}
+
+.App {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.stage {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(120% 120% at 50% 18%, #fbf6ea 0%, var(--cream) 46%, var(--cream-deep) 100%);
+}
+
+/* subtle paper grain */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* ===== Snow ===== */
+.snow-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+.flake {
+  position: absolute;
+  top: -8vh;
+  border-radius: 50%;
+  will-change: transform;
+  animation-name: snow-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes snow-fall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% {
+    transform: translate3d(var(--drift, 2vw), 112vh, 0) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* ===== Typography ===== */
+.font-display { font-family: "Playfair Display", Georgia, serif; }
+.font-serif-soft { font-family: "Cormorant Garamond", Georgia, serif; }
+.font-type { font-family: "Special Elite", "Courier New", monospace; }
+
+/* blinking caret */
+.caret {
+  display: inline-block;
+  width: 2px;
+  margin-left: 1px;
+  background: var(--holly-red);
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* gentle breathing glow behind the card */
+.card-glow {
+  position: absolute;
+  inset: -14% -14%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,162,75,0.28) 0%, rgba(178,34,49,0.10) 42%, transparent 70%);
+  filter: blur(10px);
+  animation: breathe 5.5s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(0.96); opacity: 0.75; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+
+/* card paper edges */
+.card-face {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 30px 60px -22px rgba(43,42,38,0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flake, .card-glow, .caret { animation: none !important; }
+}
+
+/* ===== Envelope ===== */
+.envelope-shadow {
+  box-shadow: 0 34px 60px -26px rgba(43, 42, 38, 0.55);
+}
+.pressable {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pressable:focus-visible {
+  outline: 2px solid var(--holly-red);
+  outline-offset: 4px;
+}
+
+/* postage stamp with perforated edge */
+.stamp {
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 2px 6px rgba(43, 42, 38, 0.28);
+  -webkit-mask:
+    radial-gradient(circle 3.2px at center, transparent 96%, #000) -5px -5px / 10px 10px round;
+  mask:
+    radial-gradient(circle 3.2px at center, transparent 96%, #000) -5px -5px / 10px 10px round;
+}
+
+/* wax seal */
+.wax-seal {
+  background: radial-gradient(circle at 36% 32%, #d1495b 0%, #a21e2d 60%, #7d1522 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.35),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.35),
+    0 3px 8px rgba(125, 21, 34, 0.5);
+}
+
+.handwriting {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+}
+
+/* ===== The New Yorker editorial treatment ===== */
+.ny-masthead {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 0.92;
+}
+.ny-the {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 500;
+  font-style: italic;
+}
+.ny-caption {
+  font-family: "EB Garamond", Georgia, serif;
+  font-style: italic;
+}
+.smallcaps {
+  font-family: "EB Garamond", Georgia, serif;
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  font-weight: 500;
+}
+.ny-rule {
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.85;
+}
+.ny-rule-thin {
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.28;
+}
+.dropcap::first-letter {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 800;
+  font-size: 3.1em;
+  line-height: 0.72;
+  float: left;
+  padding: 6px 10px 0 0;
+  color: var(--holly-red);
+}
+
+
