@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import { Snowflake, RotateCcw, ChevronUp } from "lucide-react";
 import Snow from "@/components/Snow";
 import stampImg from "@/assets/typewriter_art.png";
@@ -13,6 +13,8 @@ const SIGNOFF = "with love, the smarter Tyagi sister";
 const FULL_TEXT = `${GREETING}\n\n${BODY}\n\n${SIGNOFF}`;
 
 const EASE = [0.22, 1, 0.36, 1];
+const OPEN_DEG = -172; // flap rotation when the card is fully open
+const DRAG_PX = 260; // how far you drag up to open the card all the way
 
 export default function ChristmasCard() {
   // 'sealed' -> (click) -> 'card' (folded, shows graphic) -> (click) -> flat & typing
@@ -23,6 +25,11 @@ export default function ChristmasCard() {
   const [typed, setTyped] = useState(0);
   const timers = useRef([]);
   const typeTimer = useRef(null);
+
+  // The flap angle is driven live by the drag; the card's top margin follows it
+  const flapRot = useMotionValue(0);
+  const lift = useTransform(flapRot, [0, OPEN_DEG], [0, 300]);
+  const drag = useRef({ active: false, startY: 0, startRot: 0, moved: false });
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -40,6 +47,35 @@ export default function ChristmasCard() {
     if (step !== "card") return;
     setCardFlat((v) => !v);
   }, [step]);
+
+  /* press, drag up, release to open (drag down to close) */
+  const onDragStart = (e) => {
+    if (step !== "card") return;
+    drag.current = { active: true, startY: e.clientY, startRot: flapRot.get(), moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onDragMove = (e) => {
+    const d = drag.current;
+    if (!d.active) return;
+    const dy = d.startY - e.clientY; // up is positive
+    if (Math.abs(dy) > 6) d.moved = true;
+    const rot = d.startRot - (dy / DRAG_PX) * Math.abs(OPEN_DEG);
+    flapRot.set(Math.min(0, Math.max(OPEN_DEG, rot)));
+  };
+  const onDragEnd = () => {
+    const d = drag.current;
+    if (!d.active) return;
+    d.active = false;
+    if (!d.moved) return; // a plain click does nothing
+    const open = flapRot.get() < OPEN_DEG * 0.4;
+    animate(flapRot, open ? OPEN_DEG : 0, { duration: 0.6, ease: EASE });
+    setCardFlat(open);
+  };
+
+  /* keep the flap in step when the state changes any other way (replay, keyboard) */
+  useEffect(() => {
+    animate(flapRot, cardFlat ? OPEN_DEG : 0, { duration: 1.1, ease: EASE });
+  }, [cardFlat, flapRot]);
 
   const replay = useCallback(() => {
     clearTimers();
@@ -81,8 +117,30 @@ export default function ChristmasCard() {
   const visibleText = FULL_TEXT.slice(0, typed);
 
   return (
-    <div className="stage" data-testid="card-stage">
+    <div className="stage pt-[104px] sm:pt-[120px]" data-testid="card-stage">
       <Snow count={50} />
+
+      {/* page masthead, centered across the top of the page */}
+      <header
+        className="absolute inset-x-0 top-0 z-20 flex flex-col items-center pt-5 sm:pt-7 pointer-events-none"
+        data-testid="page-masthead"
+      >
+        <span className="ny-the text-[15px] sm:text-[19px]" style={{ color: "var(--ink)" }}>
+          The
+        </span>
+        <h1
+          className="ny-masthead text-[38px] sm:text-[56px] text-center"
+          style={{ color: "var(--ink)", marginTop: -2 }}
+        >
+          New&nbsp;Yorker
+        </h1>
+        <span
+          className="smallcaps mt-1.5 text-[10px] sm:text-[12px]"
+          style={{ color: "var(--holly-red)" }}
+        >
+          Christmas
+        </span>
+      </header>
 
       <AnimatePresence mode="wait">
         {step === "sealed" ? (
@@ -239,18 +297,24 @@ export default function ChristmasCard() {
                 the card while open, so the whole open spread is re-centered and nothing clips. */}
             <motion.div
               className="scale-[0.82] sm:scale-100"
-              style={{ perspective: 1700 }}
-              initial={false}
-              animate={{ marginTop: cardFlat ? 300 : 0 }}
-              transition={{ duration: 1.1, ease: EASE }}
+              style={{ perspective: 1700, marginTop: lift }}
             >
               <button
                 type="button"
-                onClick={toggleCard}
-                aria-label={cardFlat ? "Close the card" : "Open the card"}
+                onPointerDown={onDragStart}
+                onPointerMove={onDragMove}
+                onPointerUp={onDragEnd}
+                onPointerCancel={onDragEnd}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleCard();
+                  }
+                }}
+                aria-label={cardFlat ? "Drag down to close the card" : "Drag up to open the card"}
                 data-testid="card-open-toggle"
-                className="pressable relative block"
-                style={{ width: 480, height: 300 }}
+                className="pressable relative block select-none"
+                style={{ width: 480, height: 300, touchAction: "none", cursor: "grab" }}
               >
                 {/* lower panel = inside with the letter (revealed when flap lifts) */}
                 <div
@@ -313,10 +377,8 @@ export default function ChristmasCard() {
                     transformOrigin: "center top",
                     transformStyle: "preserve-3d",
                     zIndex: 10,
+                    rotateX: flapRot,
                   }}
-                  initial={false}
-                  animate={{ rotateX: cardFlat ? -172 : 0 }}
-                  transition={{ duration: 1.1, ease: EASE }}
                 >
                   {/* front of flap = couple illustration */}
                   <div
@@ -355,20 +417,18 @@ export default function ChristmasCard() {
             <div className="mt-8 flex flex-col items-center gap-3 text-center">
               <AnimatePresence mode="wait">
                 {!cardFlat ? (
-                  <motion.button
+                  <motion.div
                     key="open-hint"
-                    type="button"
-                    onClick={toggleCard}
                     data-testid="card-open-hint"
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: [0, -4, 0] }}
                     exit={{ opacity: 0 }}
                     transition={{ y: { duration: 1.8, repeat: Infinity }, opacity: { duration: 0.4 } }}
-                    className="pressable inline-flex items-center gap-2 font-serif-soft text-lg italic"
+                    className="inline-flex items-center gap-2 font-serif-soft text-lg italic"
                     style={{ color: "var(--holly-red)" }}
                   >
-                    <ChevronUp size={18} /> lift the card open
-                  </motion.button>
+                    <ChevronUp size={18} /> press, drag up, and let go
+                  </motion.div>
                 ) : (
                   <motion.div
                     key="replay"
@@ -416,22 +476,6 @@ function FoldedFront({ compact = false }) {
       />
       {/* inner keyline */}
       <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 0 1px rgba(43,42,38,0.35)" }} />
-
-      {/* masthead over a soft top scrim */}
-      <div
-        className="absolute inset-x-0 top-0 flex flex-col items-center pt-2.5 pb-6"
-        style={{ background: "linear-gradient(180deg, rgba(243,234,214,0.96), transparent)" }}
-      >
-        <span className="ny-the" style={{ fontSize: compact ? 11 : 14, color: "var(--ink)" }}>
-          The
-        </span>
-        <span
-          className="ny-masthead"
-          style={{ fontSize: compact ? 22 : 30, color: "var(--ink)", marginTop: -2 }}
-        >
-          New&nbsp;Yorker
-        </span>
-      </div>
 
       {/* dateline / price over a soft bottom scrim */}
       <div
