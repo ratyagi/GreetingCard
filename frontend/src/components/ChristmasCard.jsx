@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import { Snowflake, RotateCcw, ChevronUp } from "lucide-react";
 import Snow from "@/components/Snow";
+import Music from "@/components/Music";
 import stampImg from "@/assets/typewriter_art.png";
 import coupleImg from "@/assets/couple_art.jpg";
+import sealImg from "@/assets/seal.png";
 
 /* ---- The message (editable) ---- */
 const GREETING = "Dear Dr. Tyagi,";
@@ -165,7 +167,8 @@ export default function ChristmasCard() {
 
   return (
     <div className="stage" style={{ paddingTop: pad, height: "100vh" }} data-testid="card-stage">
-      <Snow count={50} />
+      <Snow count={50} swell={cardFlat} />
+      <Music />
 
       {/* page masthead, centered across the top of the page */}
       <header
@@ -182,8 +185,8 @@ export default function ChristmasCard() {
           New&nbsp;Yorker
         </h1>
         <span
-          className="smallcaps mt-1.5 text-[10px] sm:text-[12px]"
-          style={{ color: "var(--holly-red)" }}
+          className="smallcaps foil-text mt-1.5 text-[10px] sm:text-[12px]"
+          style={{ color: "var(--holly-red)", "--foil-base": "var(--holly-red)" }}
         >
           Christmas
         </span>
@@ -309,8 +312,8 @@ export default function ChristmasCard() {
                     <div className="ny-rule-thin mt-[3px]" />
 
                     <h2
-                      className="ny-masthead mt-2 text-left"
-                      style={{ fontSize: 24, color: "var(--ink)" }}
+                      className="ny-masthead foil-text mt-2 text-left"
+                      style={{ fontSize: 24, color: "var(--ink)", "--foil-base": "var(--ink)" }}
                     >
                       Merry Christmas
                     </h2>
@@ -520,10 +523,17 @@ export default function ChristmasCard() {
                     />
                   </svg>
                   <div
-                    className="wax-seal absolute left-1/2 flex items-center justify-center rounded-full"
-                    style={{ width: 46, height: 46, top: 128, transform: "translateX(-50%)" }}
+                    className="foil-seal absolute left-1/2"
+                    style={{
+                      width: 62,
+                      height: 57,
+                      top: 122,
+                      transform: "translateX(-50%)",
+                      filter: "drop-shadow(0 3px 4px rgba(60,40,20,0.45))",
+                      "--seal-mask": `url(${sealImg})`,
+                    }}
                   >
-                    <Snowflake size={22} color="#f3d9c0" strokeWidth={1.75} />
+                    <img src={sealImg} alt="" className="block h-full w-full" draggable={false} />
                   </div>
                 </div>
                 {/* inside of the flap, seen once it is open */}
@@ -645,7 +655,7 @@ function FoldedFront({ compact = false }) {
         </span>
         <span
           className="ny-caption"
-          style={{ fontSize: compact ? 12 : 15, color: "var(--holly-red)" }}
+          style={{ fontSize: compact ? 12 : 15, color: "var(--ink)" }}
         >
           open me &hearts;
         </span>
