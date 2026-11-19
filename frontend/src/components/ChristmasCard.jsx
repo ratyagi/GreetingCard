@@ -235,7 +235,15 @@ export default function ChristmasCard() {
           >
             <div className="card-glow" />
 
-            <div className="scale-[0.82] sm:scale-100" style={{ perspective: 1700 }}>
+            {/* When the flap lifts it swings ~300px above the card. Reserve that room above
+                the card while open, so the whole open spread is re-centered and nothing clips. */}
+            <motion.div
+              className="scale-[0.82] sm:scale-100"
+              style={{ perspective: 1700 }}
+              initial={false}
+              animate={{ marginTop: cardFlat ? 300 : 0 }}
+              transition={{ duration: 1.1, ease: EASE }}
+            >
               <button
                 type="button"
                 onClick={toggleCard}
@@ -341,7 +349,7 @@ export default function ChristmasCard() {
                   </div>
                 </motion.div>
               </button>
-            </div>
+            </motion.div>
 
             {/* hint + replay */}
             <div className="mt-8 flex flex-col items-center gap-3 text-center">
