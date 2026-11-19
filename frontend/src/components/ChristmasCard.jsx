@@ -522,19 +522,24 @@ export default function ChristmasCard() {
                       opacity="0.7"
                     />
                   </svg>
-                  <div
-                    className="foil-seal absolute left-1/2"
+                  {/* The seal sits on the outside of the flap. It is hidden explicitly as the flap
+                      lifts, instead of relying on the browser to hide the flap's back side. */}
+                  <motion.div
+                    className="foil-seal absolute"
                     style={{
                       width: 62,
                       height: 57,
                       top: 122,
-                      transform: "translateX(-50%)",
+                      left: "calc(50% - 31px)",
                       filter: "drop-shadow(0 3px 4px rgba(60,40,20,0.45))",
                       "--seal-mask": `url(${sealImg})`,
                     }}
+                    initial={false}
+                    animate={{ opacity: flapOpen ? 0 : 1 }}
+                    transition={{ duration: 0.12, delay: flapOpen ? 0.16 : 0 }}
                   >
                     <img src={sealImg} alt="" className="block h-full w-full" draggable={false} />
-                  </div>
+                  </motion.div>
                 </div>
                 {/* inside of the flap, seen once it is open */}
                 <div
