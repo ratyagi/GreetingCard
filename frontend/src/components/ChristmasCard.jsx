@@ -472,7 +472,10 @@ export default function ChristmasCard() {
                 </div>
               </motion.button>
 
-              {/* envelope flap: closed over the opening; lifts up and tucks behind the card */}
+              {/* envelope flap: closed over the opening; lifts up and tucks behind the card.
+                  The outer layer does the fading / sinking, the inner layer does the 3D flip.
+                  They must stay separate: fading a 3D element flattens it, which would show the
+                  flap's outside (and the seal) again in place of its lining. */}
               <motion.div
                 onClick={openEnvelope}
                 className="absolute"
@@ -481,17 +484,25 @@ export default function ChristmasCard() {
                   top: 0,
                   width: 470,
                   height: 186,
-                  transformOrigin: "top center",
-                  transformPerspective: 1100,
-                  transformStyle: "preserve-3d",
                   zIndex: flapBehind ? 1 : 5,
                   cursor: step === "sealed" && !flapOpen ? "pointer" : "default",
                   pointerEvents: step === "sealed" && !flapOpen ? "auto" : "none",
                 }}
                 initial={false}
-                animate={{ rotateX: flapOpen ? 180 : 0, ...envAnim }}
-                transition={{ rotateX: { duration: 0.55, ease: EASE }, default: ENV_EXIT }}
+                animate={envAnim}
+                transition={ENV_EXIT}
               >
+               <motion.div
+                className="absolute inset-0"
+                style={{
+                  transformOrigin: "top center",
+                  transformPerspective: 1100,
+                  transformStyle: "preserve-3d",
+                }}
+                initial={false}
+                animate={{ rotateX: flapOpen ? 180 : 0 }}
+                transition={{ duration: 0.55, ease: EASE }}
+               >
                 {/* outside of the flap, with the wax seal */}
                 <div className="absolute inset-0" style={{ backfaceVisibility: "hidden" }}>
                   <svg
@@ -568,6 +579,7 @@ export default function ChristmasCard() {
                     />
                   </svg>
                 </div>
+               </motion.div>
               </motion.div>
             </motion.div>
            </motion.div>
